@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Consumption Prediction Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            position: fixed; left: 0; top: 0;
+            width: 240px; height: 100vh;
+            background: linear-gradient(180deg, #0f0f2e, #141430);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            padding: 24px 0;
+            z-index: 100;
+            display: flex; flex-direction: column;
+        }
+        .sidebar .logo {
+            padding: 0 24px 28px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 12px;
+        }
+        .sidebar .logo h2 {
+            font-size: 1.15rem; font-weight: 700;
+            background: linear-gradient(135deg, #00d2ff, #7b2ff7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .sidebar .logo p { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        
+        .nav-links { flex: 1; padding: 8px 12px; }
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 10px;
+            color: #888; font-size: 0.85rem; font-weight: 500;
+            text-decoration: none; cursor: pointer;
+            transition: all 0.2s; margin-bottom: 4px;
+        }
+        .nav-link:hover, .nav-link.active {
+            background: rgba(0,210,255,0.08);
+            color: #00d2ff;
+        }
+        .nav-link .icon { font-size: 1.1rem; width: 24px; text-align: center; }
+
+        /* ── Main Content ── */
+        .main { margin-left: 240px; padding: 28px 36px; }
+
+        /* ── Section Headers ── */
+        .section-title {
+            font-size: 1.4rem; font-weight: 700; margin-bottom: 6px;
+            color: #ffffff;
+        }
+        .section-subtitle {
+            font-size: 0.85rem; color: #666; margin-bottom: 24px;
+        }
+
+        /* ── Stats Grid ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px; margin-bottom: 36px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px; padding: 20px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(0,210,255,0.2);
+        }
+        .stat-card .label {
+            font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 0.8px; color: #666; margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 1.5rem; font-weight: 700;
+        }
+        .stat-card .unit { font-size: 0.75rem; color: #888; margin-top: 2px; }
+        .stat-card.primary .value {
+            background: linear-gradient(135deg, #00d2ff, #7b2ff7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .stat-card.success .value { color: #4CAF50; }
+        .stat-card.warning .value { color: #FF9800; }
+        .stat-card.info .value { color: #2196F3; }
+
+        /* ── Section Tabs ── */
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* ── Model Cards ── */
+        .model-comparison {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 20px; margin-bottom: 30px;
+        }
+        .model-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px; padding: 24px;
+            position: relative; overflow: hidden;
+        }
+        .model-card.winner { border-color: rgba(76,175,80,0.3); }
+        .model-card.winner::before {
+            content: '★ BEST MODEL';
+            position: absolute; top: 14px; right: 14px;
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white; padding: 4px 12px; border-radius: 20px;
+            font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px;
+        }
+        .model-card h3 {
+            font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;
+        }
+        .model-card .model-type {
+            font-size: 0.75rem; color: #888; margin-bottom: 16px;
+        }
+        .model-card .metric-row {
+            display: flex; justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .model-card .metric-row:last-child { border: none; }
+        .model-card .metric-label { color: #888; font-size: 0.85rem; }
+        .model-card .metric-val { font-weight: 600; font-size: 0.9rem; }
+        .lstm-color { color: #9C27B0; }
+        .ann-color { color: #FF9800; }
+
+        /* ── Chart Grid ── */
+        .chart-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px; margin-bottom: 30px;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px; overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .chart-card:hover { transform: translateY(-3px); }
+        .chart-card img {
+            width: 100%; height: auto; display: block;
+        }
+        .chart-card .chart-info {
+            padding: 16px 20px;
+        }
+        .chart-card .chart-info h4 {
+            font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;
+        }
+        .chart-card .chart-info p {
+            font-size: 0.75rem; color: #888; line-height: 1.4;
+        }
+
+        /* ── Prediction Form ── */
+        .predict-container {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 28px;
+        }
+        .predict-form {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px; padding: 28px;
+        }
+        .predict-form h3 {
+            font-size: 1.05rem; font-weight: 600; margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block; font-size: 0.75rem; color: #888;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 6px; font-weight: 500;
+        }
+        .form-group input, .form-group select {
+            width: 100%; padding: 11px 14px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px; color: #fff;
+            font-family: 'Inter', sans-serif; font-size: 0.9rem;
+            outline: none; transition: all 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #00d2ff;
+            box-shadow: 0 0 0 3px rgba(0,210,255,0.1);
+        }
+        .form-group select option { background: #1a1a2e; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+        .btn-predict {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #00d2ff, #7b2ff7);
+            border: none; border-radius: 12px;
+            color: white; font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; margin-top: 8px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+        }
+        .btn-predict:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,210,255,0.3);
+        }
+        .btn-predict:disabled {
+            opacity: 0.6; cursor: not-allowed; transform: none;
+        }
+
+        /* ── Prediction Result ── */
+        .predict-result {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px; padding: 28px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; min-height: 400px;
+        }
+        .predict-result .waiting {
+            color: #555; font-size: 0.9rem;
+        }
+        .predict-result .waiting .icon { font-size: 3rem; margin-bottom: 16px; }
+        .result-value {
+            font-size: 2.8rem; font-weight: 800;
+            background: linear-gradient(135deg, #00d2ff, #7b2ff7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin: 12px 0 4px;
+        }
+        .result-unit { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
+        .result-details {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px; width: 100%; margin-top: 16px;
+        }
+        .result-detail {
+            background: rgba(255,255,255,0.04);
+            padding: 12px; border-radius: 10px;
+        }
+        .result-detail .rd-label { font-size: 0.65rem; color: #666; text-transform: uppercase; }
+        .result-detail .rd-value { font-size: 0.9rem; font-weight: 600; margin-top: 4px; }
+
+        /* ── Model Comparison Chart ── */
+        .full-width-chart {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px; overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .full-width-chart img { width: 100%; height: auto; display: block; }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center; padding: 30px;
+            color: #444; font-size: 0.75rem;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            margin-top: 40px;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; padding: 16px; }
+            .model-comparison, .predict-container { grid-template-columns: 1fr; }
+            .chart-grid { grid-template-columns: 1fr; }
+            .result-details { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .section.active { animation: fadeIn 0.3s ease; }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 24px; height: 24px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #00d2ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar Navigation -->
+<nav class="sidebar">
+    <div class="logo">
+        <h2>💧 AquaPredict</h2>
+        <p>Data Mining Project</p>
+    </div>
+    <div class="nav-links">
+        <a class="nav-link active" onclick="showSection('overview')" id="nav-overview">
+            <span class="icon">📊</span> Overview
+        </a>
+        <a class="nav-link" onclick="showSection('eda')" id="nav-eda">
+            <span class="icon">📈</span> EDA Charts
+        </a>
+        <a class="nav-link" onclick="showSection('models')" id="nav-models">
+            <span class="icon">🤖</span> Model Comparison
+        </a>
+        <a class="nav-link" onclick="showSection('predict')" id="nav-predict">
+            <span class="icon">🔮</span> Predict Demand
+        </a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+    <!-- ═══════════════════════════════ OVERVIEW ═══════════════════════════════ -->
+    <div class="section active" id="section-overview">
+        <h1 class="section-title">Dashboard Overview</h1>
+        <p class="section-subtitle">Water consumption prediction using Deep Learning — ANN & LSTM</p>
+
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <div class="label">Total Records</div>
+                <div class="value">{{ total_rows }}</div>
+                <div class="unit">data points</div>
+            </div>
+            <div class="stat-card info">
+                <div class="label">Time Period</div>
+                <div class="value" style="font-size:1.1rem">{{ date_range }}</div>
+                <div class="unit">coverage</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="label">Zones Covered</div>
+                <div class="value">{{ n_zones }}</div>
+                <div class="unit">zip codes</div>
+            </div>
+            <div class="stat-card success">
+                <div class="label">Best Model R²</div>
+                <div class="value">{{ lstm_r2 }}</div>
+                <div class="unit">LSTM</div>
+            </div>
+            <div class="stat-card info">
+                <div class="label">Avg Monthly Demand</div>
+                <div class="value" style="font-size:1.15rem">{{ avg_demand }}</div>
+                <div class="unit">gallons</div>
+            </div>
+            <div class="stat-card primary">
+                <div class="label">Total Demand</div>
+                <div class="value">{{ total_demand }}B</div>
+                <div class="unit">gallons (all time)</div>
+            </div>
+        </div>
+
+        <!-- Model Quick Summary -->
+        <h2 class="section-title" style="font-size:1.15rem; margin-bottom: 16px;">Model Performance Summary</h2>
+        <div class="model-comparison">
+            <div class="model-card winner">
+                <h3 class="lstm-color">LSTM</h3>
+                <div class="model-type">Long Short-Term Memory — Sequential Deep Learning</div>
+                <div class="metric-row">
+                    <span class="metric-label">R² Score</span>
+                    <span class="metric-val lstm-color">{{ lstm_r2 }}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">MAE</span>
+                    <span class="metric-val">{{ lstm_mae }} gal</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">RMSE</span>
+                    <span class="metric-val">{{ lstm_rmse }} gal</span>
+                </div>
+            </div>
+            <div class="model-card">
+                <h3 class="ann-color">ANN</h3>
+                <div class="model-type">Artificial Neural Network — Multi-Layer Perceptron</div>
+                <div class="metric-row">
+                    <span class="metric-label">R² Score</span>
+                    <span class="metric-val ann-color">{{ ann_r2 }}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">MAE</span>
+                    <span class="metric-val">{{ ann_mae }} gal</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">RMSE</span>
+                    <span class="metric-val">{{ ann_rmse }} gal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════ EDA ═══════════════════════════════ -->
+    <div class="section" id="section-eda">
+        <h1 class="section-title">Exploratory Data Analysis</h1>
+        <p class="section-subtitle">Visual insights into water consumption patterns, seasonal trends, and feature relationships</p>
+
+        <div class="chart-grid">
+            {% for chart in eda_charts %}
+            <div class="chart-card">
+                <img src="/charts/{{ chart.file }}" alt="{{ chart.title }}" loading="lazy">
+                <div class="chart-info">
+                    <h4>{{ chart.title }}</h4>
+                    <p>{{ chart.desc }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════ MODELS ═══════════════════════════════ -->
+    <div class="section" id="section-models">
+        <h1 class="section-title">Model Comparison</h1>
+        <p class="section-subtitle">Head-to-head performance analysis — LSTM vs ANN vs Random Forest</p>
+
+        {% for chart in model_charts %}
+        <div class="full-width-chart">
+            <img src="/charts/{{ chart }}" alt="Model comparison chart" loading="lazy">
+        </div>
+        {% endfor %}
+
+        <h2 class="section-title" style="font-size:1.1rem; margin-top: 20px; margin-bottom: 16px;">Detailed Metrics</h2>
+        <div class="model-comparison">
+            <div class="model-card winner">
+                <h3 class="lstm-color">LSTM (Winner)</h3>
+                <div class="model-type">Bidirectional LSTM with 6-month lookback sequences</div>
+                <div class="metric-row">
+                    <span class="metric-label">Architecture</span>
+                    <span class="metric-val" style="font-size:0.8rem">BiLSTM(128) → LSTM(64) → Dense(32)</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">R² Score</span>
+                    <span class="metric-val lstm-color">{{ lstm_r2 }}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">MAE</span>
+                    <span class="metric-val">{{ lstm_mae }} gallons</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">RMSE</span>
+                    <span class="metric-val">{{ lstm_rmse }} gallons</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Key Advantage</span>
+                    <span class="metric-val" style="font-size:0.8rem; color:#4CAF50">Captures temporal patterns</span>
+                </div>
+            </div>
+            <div class="model-card">
+                <h3 class="ann-color">ANN (Tuned v2)</h3>
+                <div class="model-type">Deep MLP with One-Hot Encoding & BatchNorm</div>
+                <div class="metric-row">
+                    <span class="metric-label">Architecture</span>
+                    <span class="metric-val" style="font-size:0.8rem">512 → 256 → 128 → 64 → 1</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">R² Score</span>
+                    <span class="metric-val ann-color">{{ ann_r2 }}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">MAE</span>
+                    <span class="metric-val">{{ ann_mae }} gallons</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">RMSE</span>
+                    <span class="metric-val">{{ ann_rmse }} gallons</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Tuning Journey</span>
+                    <span class="metric-val" style="font-size:0.8rem; color:#FF9800">R² 0.68 → {{ ann_r2 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════ PREDICT ═══════════════════════════════ -->
+    <div class="section" id="section-predict">
+        <h1 class="section-title">Predict Water Demand</h1>
+        <p class="section-subtitle">Enter weather and zone parameters — powered by LSTM (R² = {{ lstm_r2 }})</p>
+
+        <div class="predict-container">
+            <div class="predict-form">
+                <h3>📝 Input Parameters</h3>
+                <form id="predictForm" onsubmit="submitPrediction(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Month</label>
+                            <select name="month" required>
+                                <option value="">Select month</option>
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Zone (Zip Code)</label>
+                            <select name="zone" required>
+                                <option value="">Select zone</option>
+                                {% for z in zones %}
+                                <option value="{{ z }}">{{ z }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Customer Class</label>
+                        <select name="customer_class" required>
+                            <option value="">Select class</option>
+                            {% for c in classes %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Avg Temperature (°F)</label>
+                            <input type="number" name="avg_temp" step="0.1" placeholder="e.g. 75.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Total Precipitation (in)</label>
+                            <input type="number" name="total_precip" step="0.01" placeholder="e.g. 2.5" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Avg Humidity (%)</label>
+                        <input type="number" name="avg_humidity" step="0.1" placeholder="e.g. 65.0" required>
+                    </div>
+                    <button type="submit" class="btn-predict" id="btnPredict">
+                        🔮 Predict Water Demand
+                    </button>
+                </form>
+            </div>
+
+            <div class="predict-result" id="resultPanel">
+                <div class="waiting" id="waitingState">
+                    <div class="icon">🔮</div>
+                    <p>Fill in the parameters and click predict<br>to see the forecasted water demand</p>
+                </div>
+                <div id="resultState" style="display:none; width:100%;">
+                    <div style="font-size:0.8rem; color:#888; text-transform:uppercase; letter-spacing:1px;">Predicted Water Demand</div>
+                    <div class="result-value" id="predValue">—</div>
+                    <div class="result-unit">Gallons</div>
+                    <div class="result-details">
+                        <div class="result-detail">
+                            <div class="rd-label">Month</div>
+                            <div class="rd-value" id="rdMonth">—</div>
+                        </div>
+                        <div class="result-detail">
+                            <div class="rd-label">Zone</div>
+                            <div class="rd-value" id="rdZone">—</div>
+                        </div>
+                        <div class="result-detail">
+                            <div class="rd-label">Season</div>
+                            <div class="rd-value" id="rdSeason">—</div>
+                        </div>
+                        <div class="result-detail">
+                            <div class="rd-label">Temperature</div>
+                            <div class="rd-value" id="rdTemp">—</div>
+                        </div>
+                        <div class="result-detail">
+                            <div class="rd-label">Precipitation</div>
+                            <div class="rd-value" id="rdPrecip">—</div>
+                        </div>
+                        <div class="result-detail">
+                            <div class="rd-label">Model</div>
+                            <div class="rd-value" id="rdModel">LSTM</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Water Consumption Prediction — Data Mining Project &mdash; Powered by LSTM &amp; ANN Deep Learning Models
+    </div>
+</div>
+
+<script>
+function showSection(id) {
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+    
+    // Show target
+    document.getElementById('section-' + id).classList.add('active');
+    document.getElementById('nav-' + id).classList.add('active');
+}
+
+async function submitPrediction(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnPredict');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner"></span> Predicting...';
+
+    const form = document.getElementById('predictForm');
+    const data = new FormData(form);
+
+    try {
+        const res = await fetch('/predict', { method: 'POST', body: data });
+        const json = await res.json();
+
+        if (json.success) {
+            document.getElementById('waitingState').style.display = 'none';
+            document.getElementById('resultState').style.display = 'block';
+            document.getElementById('predValue').textContent = json.prediction;
+            document.getElementById('rdMonth').textContent = json.month_name;
+            document.getElementById('rdZone').textContent = json.zone;
+            document.getElementById('rdSeason').textContent = json.season;
+            document.getElementById('rdTemp').textContent = json.avg_temp + '°F';
+            document.getElementById('rdPrecip').textContent = json.total_precip + ' in';
+            document.getElementById('rdModel').textContent = json.model + ' (R²=' + json.r2 + ')';
+        } else {
+            alert('Prediction error: ' + json.error);
+        }
+    } catch (err) {
+        alert('Network error: ' + err.message);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🔮 Predict Water Demand';
+}
+</script>
+
+</body>
+</html>
