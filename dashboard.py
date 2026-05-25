@@ -131,7 +131,7 @@ def predict():
         total_precip = float(request.form['total_precip'])
         avg_humidity = float(request.form['avg_humidity'])
 
-        # Build a sequence from the last 6 months of data for this zone-class
+        # Build a sequence from the last 12 months of data for this zone-class
         zone_encoded = le_zone.transform([zone])[0]
         class_encoded = le_class.transform([customer_class])[0]
         season = get_season(month)
@@ -140,35 +140,41 @@ def predict():
         group_df = df[(df['Zone_Encoded'] == zone_encoded) & 
                       (df['Class_Encoded'] == class_encoded)].sort_values('Date')
 
-        if len(group_df) < 6:
+        if len(group_df) < 12:
             # Not enough history — use synthetic sequence from averages
             month_sin = np.sin(2 * np.pi * month / 12)
             month_cos = np.cos(2 * np.pi * month / 12)
             avg_demand_val = group_df['Water_Demand_Gallons'].mean() if len(group_df) > 0 else df['Water_Demand_Gallons'].mean()
             
-            row = [month_sin, month_cos, avg_temp, total_precip, avg_humidity, avg_demand_val]
-            sequence = np.array([row] * 6)
+            row = [zone_encoded, class_encoded, month_sin, month_cos, avg_temp, total_precip, avg_humidity, avg_demand_val]
+            sequence = np.array([row] * 12)
         else:
-            # Use last 6 rows as the sequence
-            last_6 = group_df.tail(6)
-            sequence = last_6[['Month_Sin', 'Month_Cos', 'Avg_Temp_F',
-                              'Total_Precip_Inches', 'Avg_Humidity',
-                              'Water_Demand_Gallons']].values
+            # Use last 12 rows as the sequence
+            last_12 = group_df.tail(12)
+            sequence = last_12[['Zone_Encoded', 'Class_Encoded', 'Month_Sin', 'Month_Cos', 'Avg_Temp_F',
+                               'Total_Precip_Inches', 'Avg_Humidity',
+                               'Water_Demand_Gallons']].values
             # Override the weather of the last timestep with user input
             month_sin = np.sin(2 * np.pi * month / 12)
             month_cos = np.cos(2 * np.pi * month / 12)
-            sequence[-1, 0] = month_sin
-            sequence[-1, 1] = month_cos
-            sequence[-1, 2] = avg_temp
-            sequence[-1, 3] = total_precip
-            sequence[-1, 4] = avg_humidity
+            sequence[-1, 2] = month_sin
+            sequence[-1, 3] = month_cos
+            sequence[-1, 4] = avg_temp
+            sequence[-1, 5] = total_precip
+            sequence[-1, 6] = avg_humidity
 
-        # Scale and predict
+        # Get previous raw demand (from the very last timestep in our history)
+        prev_raw_demand = sequence[-1, 7]
+
+        # Scale and predict the difference
         seq_2d = lstm_scaler_X.transform(sequence)
-        seq_3d = seq_2d.reshape(1, 6, sequence.shape[1])
+        seq_3d = seq_2d.reshape(1, 12, sequence.shape[1])
         
         pred_scaled = lstm_model.predict(seq_3d, verbose=0).flatten()
-        prediction = lstm_scaler_y.inverse_transform(pred_scaled.reshape(-1, 1)).flatten()[0]
+        pred_diff = lstm_scaler_y.inverse_transform(pred_scaled.reshape(-1, 1)).flatten()[0]
+        
+        # Un-difference to get raw prediction
+        prediction = prev_raw_demand + pred_diff
         prediction = max(0, prediction)
 
         month_names = ['January', 'February', 'March', 'April', 'May', 'June',
