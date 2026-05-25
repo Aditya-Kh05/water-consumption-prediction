@@ -9,7 +9,7 @@ A deep learning pipeline for predicting monthly urban water demand using **ANN**
 | Feature | Details |
 |---------|---------|
 | **Dataset** | 22,294 records across 48 zones (Jan 2012 — Sep 2023) |
-| **Best Model** | LSTM (R² = 0.9501) |
+| **Best Model** | LSTM (R² = 0.9386) |
 | **ANN Model** | Tuned MLP (R² = 0.8930) |
 | **Dashboard** | Interactive Flask web app with EDA, model comparison & predictions |
 
@@ -17,8 +17,8 @@ A deep learning pipeline for predicting monthly urban water demand using **ANN**
 
 ### LSTM (Long Short-Term Memory)
 - **Architecture:** BiLSTM(128) → LSTM(64) → Dense(32) → Dense(1)
-- **Approach:** 6-month sliding window sequences with autoregressive demand features
-- **R² Score:** 0.9501 | MAE: 1.9M gallons | RMSE: 4.6M gallons
+- **Approach:** 12-month sliding window sequences with stationary (differenced) targets to eliminate the 'Lag Illusion', combined with spatial Zone and Class encoding.
+- **R² Score:** 0.9386 | MAE: 1.87M gallons | RMSE: 5.15M gallons
 
 ### ANN (Artificial Neural Network)
 - **Architecture:** Dense(512) → Dense(256) → Dense(128) → Dense(64) → Dense(1)
@@ -77,7 +77,7 @@ Open **http://127.0.0.1:5000** in your browser.
 - **Weather:** Temperature (°F), Precipitation (inches), Humidity (%)
 - **Time:** Cyclical month encoding (sin/cos), Season
 - **Location:** Zone (zip code), Customer Class
-- **Autoregressive:** Past water demand (LSTM only)
+- **Autoregressive:** 12-month historical window with differenced target (change in demand)
 
 ## 📦 Tech Stack
 
