@@ -1,4 +1,4 @@
-# 💧 Water Consumption Prediction — Data Mining Project
+# 💧 Water Consumption Prediction 
 
 A deep learning pipeline for predicting monthly urban water demand using **ANN** and **LSTM** models, with an interactive Flask dashboard for visualization and real-time forecasting.
 
